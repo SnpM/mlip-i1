@@ -125,11 +125,33 @@ def upload():
         f.save(os.path.join(current_app.config['ALBUMY_UPLOAD_PATH'], filename))
         filename_s = resize_image(f, filename, current_app.config['ALBUMY_PHOTO_SIZE']['small'])
         filename_m = resize_image(f, filename, current_app.config['ALBUMY_PHOTO_SIZE']['medium'])
+        
+        import albumy.image_analyzer as image_analyzer
+        analysis_result = image_analyzer.analyze_image(os.path.join(current_app.config['ALBUMY_UPLOAD_PATH'], filename))
+        if analysis_result:
+            tags = analysis_result.tags
+            description = analysis_result.alt_text
+            # print in one line
+            print(f"Tags: {tags}; Description: {description}")
+        else:
+            description = ""
+            tags = [] 
+        # Create tags
+        for t in tags:
+            tag_obj = Tag.query.filter_by(name=t).first()
+            if tag_obj is None:
+                tag_obj = Tag(name=t)
+                db.session.add(tag_obj)
+        db.session.commit()
+        
+        # Create photo
         photo = Photo(
             filename=filename,
             filename_s=filename_s,
             filename_m=filename_m,
-            author=current_user._get_current_object()
+            author=current_user._get_current_object(),
+            description=description,
+            tags=[Tag.query.filter_by(name=t).first() for t in tags]
         )
         db.session.add(photo)
         db.session.commit()
